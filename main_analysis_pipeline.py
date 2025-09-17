@@ -72,12 +72,15 @@ class GEOAnalysisPipeline:
             # Plot data quality
             self.preprocessor.plot_data_distribution()
             
-            # Save preprocessed data
-            processed_data.to_csv(f"{self.output_dir}/preprocessed_expression.csv")
-            pd.DataFrame({
+            # Create labels dataframe
+            labels_df = pd.DataFrame({
                 'sample': metadata['sample_id'], 
                 'label': labels
-            }).to_csv(f"{self.output_dir}/labels.csv", index=False)
+            })
+
+            # Save preprocessed data (optional, as data is passed in memory)
+            processed_data.to_csv(f"{self.output_dir}/preprocessed_expression.csv")
+            labels_df.to_csv(f"{self.output_dir}/labels.csv", index=False)
             
             logger.info("Preprocessing completed successfully")
             
@@ -85,11 +88,8 @@ class GEOAnalysisPipeline:
             if perform_svm:
                 logger.info("Step 3: Running SVM classification...")
                 
-                # Load data
-                self.classifier.load_preprocessed_data(
-                    f"{self.output_dir}/preprocessed_expression.csv",
-                    f"{self.output_dir}/labels.csv"
-                )
+                # Pass data directly to the classifier
+                self.classifier.set_data(processed_data, labels_df)
                 
                 # Split data
                 self.classifier.split_data()
@@ -112,11 +112,8 @@ class GEOAnalysisPipeline:
             if perform_clustering:
                 logger.info("Step 4: Running K-means clustering...")
                 
-                # Load data
-                self.clusterer.load_preprocessed_data(
-                    f"{self.output_dir}/preprocessed_expression.csv",
-                    f"{self.output_dir}/labels.csv"
-                )
+                # Pass data directly to the clusterer
+                self.clusterer.set_data(processed_data, labels_df)
                 
                 # Prepare data
                 self.clusterer.prepare_data_for_clustering(scale=True, n_components=50)

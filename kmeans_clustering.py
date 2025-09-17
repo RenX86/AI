@@ -18,21 +18,29 @@ class KMeansClusterer:
         self.pca = PCA()
         self.optimal_k = None
     
-    def load_preprocessed_data(self, expression_file, labels_file=None):
-        """Load preprocessed data"""
-        self.X = pd.read_csv(expression_file, index_col=0)
+    def set_data(self, expression_data, labels_df=None):
+        """Set preprocessed data"""
+        self.X = expression_data
         
-        if labels_file:
-            labels_df = pd.read_csv(labels_file)
+        if labels_df is not None:
             self.true_labels = labels_df['label'].values
             self.sample_names = labels_df['sample'].values
         else:
             self.true_labels = None
             self.sample_names = self.X.columns
         
-        print(f"Loaded data: {self.X.shape}")
+        print(f"Data set: {self.X.shape}")
         
         return self.X
+
+    def load_preprocessed_data(self, expression_file, labels_file=None):
+        """Load preprocessed data from files"""
+        expression_data = pd.read_csv(expression_file, index_col=0)
+        labels_df = None
+        if labels_file:
+            labels_df = pd.read_csv(labels_file)
+        
+        return self.set_data(expression_data, labels_df)
     
     def prepare_data_for_clustering(self, scale=True, n_components=None):
         """Prepare data for clustering"""

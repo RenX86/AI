@@ -84,7 +84,11 @@ class GEODataPreprocessor:
                 for char_list in self.metadata['characteristics']:
                     # Simple parsing - you may need to customize this
                     if isinstance(char_list, str):
-                        if 'cancer' in char_list.lower() or 'tumor' in char_list.lower():
+                        if 'bone relapses (1=yes, 0=no): 1' in char_list:
+                            labels.append(1)
+                        elif 'bone relapses (1=yes, 0=no): 0' in char_list:
+                            labels.append(0)
+                        elif 'cancer' in char_list.lower() or 'tumor' in char_list.lower():
                             labels.append('cancer')
                         elif 'normal' in char_list.lower() or 'healthy' in char_list.lower():
                             labels.append('normal')

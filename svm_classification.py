@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.svm import SVC
-from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
+from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score, StratifiedKFold
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
 from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.pipeline import Pipeline
@@ -17,27 +17,32 @@ class SVMClassifier:
         self.feature_selector = SelectKBest(f_classif)
         self.scaler = StandardScaler()
     
-    def load_preprocessed_data(self, expression_file, labels_file):
-        """Load preprocessed data"""
-        self.X = pd.read_csv(expression_file, index_col=0)
-        labels_df = pd.read_csv(labels_file)
+    def set_data(self, expression_data, labels_df):
+        """Set preprocessed data"""
+        self.X = expression_data
         self.y = labels_df['label'].values
         self.sample_names = labels_df['sample'].values
         
-        print(f"Loaded data: {self.X.shape}")
+        print(f"Data set: {self.X.shape}")
         print(f"Label distribution: {np.bincount(self.y)}")
         
         return self.X, self.y
+
+    def load_preprocessed_data(self, expression_file, labels_file):
+        """Load preprocessed data from files"""
+        expression_data = pd.read_csv(expression_file, index_col=0)
+        labels_df = pd.read_csv(labels_file)
+        return self.set_data(expression_data, labels_df)
     
     def feature_selection(self, k=1000):
         """Select top k features based on univariate statistics"""
-        self.feature_selector.set_params(k=min(k, self.X.shape[0]))
+        self.feature_selector.set_params(k=min(k, self.X.shape[1]))
         X_selected = self.feature_selector.fit_transform(self.X.T, self.y)
         
         # Get selected feature names
-        selected_features = self.X.index[self.feature_selector.get_support()]
+        selected_features = self.X.columns[self.feature_selector.get_support()]
         
-        print(f"Selected {X_selected.shape[1]} features out of {self.X.shape[0]}")
+        print(f"Selected {X_selected.shape[1]} features out of {self.X.shape[1]}")
         
         return X_selected, selected_features
     
@@ -53,6 +58,7 @@ class SVMClassifier:
         
         print(f"Training set: {self.X_train.shape}")
         print(f"Testing set: {self.X_test.shape}")
+        print(f"y_train class distribution: {np.bincount(self.y_train)}")
         
         return self.X_train, self.X_test, self.y_train, self.y_test
     
@@ -71,14 +77,28 @@ class SVMClassifier:
             ('scaler', StandardScaler()),
             ('svm', SVC(probability=True, random_state=42))
         ])
-        
+        class_counts = np.bincount(self.y_train)
+        min_class_samples = np.min(class_counts)
+        if cv_folds > min_class_samples:
+            print(f"⚠️ Reducing cv_folds from {cv_folds} to {min_class_samples} "
+              f"because the smallest class has only {min_class_samples} samples.")
+            cv_folds = min_class_samples
+        # Stratified CV to avoid single-class folds
+        cv_strategy = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=42)
+
+        print("Performing hyperparameter tuning...")
+        print(f"y_train class distribution before grid search: {np.bincount(self.y_train)}")
+
+        # Debug: check class distribution per fold
+        for i, (train_idx, valid_idx) in enumerate(cv_strategy.split(self.X_train, self.y_train)):
+            print(f"Fold {i}: classes = {np.unique(self.y_train[train_idx])}")
+
         # Grid search
         grid_search = GridSearchCV(
-            pipeline, param_grid, cv=cv_folds, 
+            pipeline, param_grid, cv=cv_strategy, 
             scoring='accuracy', n_jobs=-1, verbose=1
         )
         
-        print("Performing hyperparameter tuning...")
         grid_search.fit(self.X_train, self.y_train)
         
         self.model = grid_search.best_estimator_
@@ -184,7 +204,7 @@ if __name__ == "__main__":
     X_train, X_test, y_train, y_test = svm_classifier.split_data()
     
     # Hyperparameter tuning
-    model = svm_classifier.hyperparameter_tuning()
+    model = svm_classifier.hyperparameter_tuning(cv_folds=5)
     
     # Train model
     svm_classifier.train_model()
