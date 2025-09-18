@@ -60,7 +60,7 @@ if __name__ == "__main__":
     downloader = GEODataDownloader()
     
     # Example: Download a cancer dataset
-    gse_id = "GSE2034"  # Breast cancer dataset
+    gse_id = "GSE307516"  # Breast cancer dataset
     gse = downloader.download_gse_dataset(gse_id)
     
     if gse:
