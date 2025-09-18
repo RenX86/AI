@@ -56,6 +56,11 @@ class KMeansClusterer:
         
         # Optional PCA for dimensionality reduction
         if n_components:
+            n_samples, n_features = X_scaled.shape
+            if n_components > min(n_samples, n_features):
+                print(f"⚠️ Warning: n_components={n_components} is greater than min(n_samples, n_features)={min(n_samples, n_features)}. Adjusting n_components.")
+                n_components = min(n_samples, n_features)
+
             self.pca = PCA(n_components=n_components)
             X_scaled = self.pca.fit_transform(X_scaled)
             print(f"PCA applied: {X_scaled.shape}")
@@ -66,7 +71,17 @@ class KMeansClusterer:
     
     def find_optimal_k(self, max_k=15, methods=['elbow', 'silhouette', 'calinski']):
         """Find optimal number of clusters using multiple methods"""
+        n_samples = self.X_processed.shape[0]
+        if max_k >= n_samples:
+            print(f"⚠️ Warning: max_k={max_k} is greater than or equal to n_samples={n_samples}. Adjusting max_k.")
+            max_k = n_samples - 1
+
         k_range = range(2, max_k + 1)
+        if not k_range:
+            print("⚠️ Warning: Not enough samples to find optimal k. Skipping.")
+            self.optimal_k = 1
+            return {}, 1
+            
         results = {}
         
         for method in methods:
@@ -80,12 +95,18 @@ class KMeansClusterer:
                 results['elbow'].append(kmeans.inertia_)
             
             if 'silhouette' in methods:
-                sil_score = silhouette_score(self.X_processed, cluster_labels)
-                results['silhouette'].append(sil_score)
-            
+                if len(np.unique(cluster_labels)) > 1:
+                    sil_score = silhouette_score(self.X_processed, cluster_labels)
+                    results['silhouette'].append(sil_score)
+                else:
+                    results['silhouette'].append(0)
+
             if 'calinski' in methods:
-                cal_score = calinski_harabasz_score(self.X_processed, cluster_labels)
-                results['calinski'].append(cal_score)
+                if len(np.unique(cluster_labels)) > 1:
+                    cal_score = calinski_harabasz_score(self.X_processed, cluster_labels)
+                    results['calinski'].append(cal_score)
+                else:
+                    results['calinski'].append(0)
         
         # Plot results
         n_plots = len(methods)
@@ -102,15 +123,24 @@ class KMeansClusterer:
             # Find optimal k for each method
             if method == 'elbow':
                 # Use elbow method (look for the "knee")
-                diffs = np.diff(results[method])
-                diffs2 = np.diff(diffs)
-                optimal_idx = np.argmax(diffs2) + 2  # +2 because of double diff
-                optimal_k_method = k_range[optimal_idx]
+                if len(results[method]) > 2:
+                    diffs = np.diff(results[method])
+                    diffs2 = np.diff(diffs)
+                    optimal_idx = np.argmax(diffs2) + 2
+                    optimal_k_method = k_range[optimal_idx]
+                else:
+                    optimal_k_method = k_range[0]
             elif method == 'silhouette':
-                optimal_k_method = k_range[np.argmax(results[method])]
+                if results[method]:
+                    optimal_k_method = k_range[np.argmax(results[method])]
+                else:
+                    optimal_k_method = k_range[0]
             elif method == 'calinski':
-                optimal_k_method = k_range[np.argmax(results[method])]
-            
+                if results[method]:
+                    optimal_k_method = k_range[np.argmax(results[method])]
+                else:
+                    optimal_k_method = k_range[0]
+
             plt.axvline(x=optimal_k_method, color='red', linestyle='--', 
                        label=f'Optimal k={optimal_k_method}')
             plt.legend()
@@ -120,11 +150,13 @@ class KMeansClusterer:
         plt.show()
         
         # Choose optimal k (majority vote or silhouette score)
-        if 'silhouette' in methods:
+        if 'silhouette' in methods and results['silhouette']:
             self.optimal_k = k_range[np.argmax(results['silhouette'])]
-        else:
+        elif methods and results[methods[0]]:
             self.optimal_k = k_range[np.argmax(results[methods[0]])]
-        
+        else:
+            self.optimal_k = 1
+
         print(f"Optimal k selected: {self.optimal_k}")
         
         return results, self.optimal_k

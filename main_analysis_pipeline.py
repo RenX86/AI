@@ -116,7 +116,8 @@ class GEOAnalysisPipeline:
                 self.clusterer.set_data(processed_data, labels_df)
                 
                 # Prepare data
-                self.clusterer.prepare_data_for_clustering(scale=True, n_components=50)
+                n_samples = processed_data.shape[1]
+                self.clusterer.prepare_data_for_clustering(scale=True, n_components=min(50, n_samples))
                 
                 # Find optimal k
                 results, optimal_k = self.clusterer.find_optimal_k(max_k=10)

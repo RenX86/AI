@@ -73,11 +73,11 @@ class SVMClassifier:
         X_clean = self.X.copy()
         
         # Replace NaN with median
-        X_clean = X_clean.fillna(X_clean.median(axis=1), axis=1)
+        X_clean = X_clean.apply(lambda row: row.fillna(row.median()), axis=1)
         
         # Replace infinite values with column max/min
         X_clean = X_clean.replace([np.inf, -np.inf], np.nan)
-        X_clean = X_clean.fillna(X_clean.median(axis=1), axis=1)
+        X_clean = X_clean.apply(lambda row: row.fillna(row.median()), axis=1)
         
         # Remove constant features (zero variance)
         feature_vars = X_clean.var(axis=1)
